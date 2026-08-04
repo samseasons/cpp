@@ -1,0 +1,1 @@
+// clang++ serve.cpp -o serve.out && ./serve.out a 1234

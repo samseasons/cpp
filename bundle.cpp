@@ -1,0 +1,1 @@
+// clang++ bundle.cpp -o bundle.out && ./bundle.out a/a.js a/y.js
