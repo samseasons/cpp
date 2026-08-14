@@ -14,23 +14,23 @@ void parse (string & file, vector<string> & imported, map<string, vector<string>
     string text;
     ifstream f(file);
     if (f.is_open()) {
-        stringstream buffer;
-        buffer << f.rdbuf();
-        text = buffer.str();
+        stringstream t;
+        t << f.rdbuf();
+        text = t.str();
         f.close();
     } else {
         texts[file] = "";
         return;
     }
-    size_t i;
+    int i, j;
     while ((i = text.find(" \n")) != -1) {
         text.replace(i, 2, "\n");
     }
     while ((i = text.find("\n\n")) != -1) {
         text.replace(i, 2, "\n");
     }
-    stringstream s(text);
     vector<string> lines;
+    stringstream s(text);
     for (string line; getline(s, line, '\n');) {
         lines.push_back(line);
     }
@@ -40,26 +40,23 @@ void parse (string & file, vector<string> & imported, map<string, vector<string>
         if (line.substr(line.find_first_not_of("\t "), 2) == "//") {
             continue;
         }
-        if (!remove && line.find("/*") != -1 && line.find("//*") == -1) {
-            if (line.find("*/") != -1) {
-                line = line.substr(0, line.find("/*")) + ' ' + line.substr(line.find("*/") + 2);
+        if (!remove && (i = line.find("/*")) != -1 && line.find("//*") == -1) {
+            if ((j = line.find("*/")) != -1) {
+                line = line.substr(0, i) + ' ' + line.substr(j + 2);
             } else {
-                line = line.substr(0, line.find("/*"));
+                line = line.substr(0, i);
                 remove = true;
             }
         }
         if (remove) {
-            i = line.find("*/");
-            if (i != -1) {
+            if ((i = line.find("*/")) != -1) {
                 line = line.substr(i + 2);
                 remove = false;
             } else {
                 continue;
             }
         }
-        while (line.back() == '\t' || line.back() == ' ') {
-            line.pop_back();
-        }
+        line = line.substr(0, line.find_last_not_of("\t ") + 1);
         if (!line.empty()) {
             text += line + "\n";
         }
@@ -70,7 +67,7 @@ void parse (string & file, vector<string> & imported, map<string, vector<string>
         if (f.rfind("./", 0) == 0) {
             f = f.substr(2);
         }
-        char i = f[0];
+        char i = f.front();
         if (i != '.' && i != '/') {
             f = file.substr(0, file.find_last_of('/')) + '/' + f;
         } else if (f.rfind("../", 0) == 0) {
@@ -80,14 +77,16 @@ void parse (string & file, vector<string> & imported, map<string, vector<string>
             }
             f = file.substr(0, file.find_last_of('/')) + '/' + f;
         }
-        return f.substr(f.length() - 3) == ".js" ? f : f + ".js";
+        if (f.substr(f.length() - 3) != ".js") {
+            f += ".js";
+        }
+        return f;
     };
 
     map<string, vector<string>> files;
     files[file] = vector<string>();
     vector<string> order;
-    i = text.find("import ");
-    while (i != -1) {
+    while ((i = text.find("import ")) != -1) {
         char t = text[i - 1];
         if (i != 0 && t != '\t' && t != '\n' && t != ' ') {
             text = text.substr(i + 6);
@@ -100,8 +99,8 @@ void parse (string & file, vector<string> & imported, map<string, vector<string>
         }
         text = text.substr(i);
         i = text.find("from");
-        size_t j = text.find('"');
-        size_t k = text.find("'");
+        j = text.find('"');
+        int k = text.find("'");
         vector<string> names;
         if (i != -1 && (i < j || j == -1) && (i < k || k == -1)) {
             while (i < text.length()) {
@@ -115,13 +114,11 @@ void parse (string & file, vector<string> & imported, map<string, vector<string>
             }
             string t = text.substr(0, i);
             j = 0;
-            k = t.find_first_of(" ,{}");
-            while (k != -1) {
-                if (k > j) {
+            while ((k = t.find_first_of(" ,{}", j)) != -1) {
+                if (j < k) {
                     names.push_back(t.substr(j, k - j));
                 }
                 j = k + 1;
-                k = t.find_first_of(" ,{}", j);
             }
             if (j < t.length()) {
                 names.push_back(t.substr(j));
@@ -144,7 +141,6 @@ void parse (string & file, vector<string> & imported, map<string, vector<string>
             }
             files[f].insert(files[f].end(), names.begin(), names.end());
         }
-        i = text.find("import ");
     }
     modules[file] = order;
     for (string & i : order) {
@@ -161,8 +157,7 @@ void parse (string & file, vector<string> & imported, map<string, vector<string>
     }
     vector<string> declares = {"async", "class", "const", "default", "function", "let", "var"};
     vector<char> defines = {'\n', ' ', '(', ',', '.', '['};
-    i = text.find("export ");
-    while (i != -1) {
+    while ((i = text.find("export ")) != -1) {
         text = text.substr(i + 7);
         for (string & name : declares) {
             i = text.find(name);
@@ -171,8 +166,7 @@ void parse (string & file, vector<string> & imported, map<string, vector<string>
             }
         }
         string names = "";
-        i = text.find('\n');
-        if (i != -1) {
+        if ((i = text.find('\n')) != -1) {
             names = text.substr(0, i);
         }
         i = 0;
@@ -182,22 +176,20 @@ void parse (string & file, vector<string> & imported, map<string, vector<string>
         vector<string> split;
         if (i < names.length() && names[i] == '{') {
             names = names.substr(i + 1);
-            stringstream s(names.substr(0, names.find('}')));
-            string name;
-            while (getline(s, name, ',')) {
+            stringstream t(names.substr(0, names.find('}')));
+            for (string name; getline(t, name, ',');) {
                 split.push_back(name);
             }
         } else {
             i = names.find('(');
-            size_t j = names.find('=');
+            j = names.find('=');
             if (j == -1 || (i < j && i != -1)) {
                 split.push_back(names);
             } else {
                 while (j != -1) {
                     split.push_back(names.substr(0, j));
                     names = names.substr(j);
-                    j = names.find(',');
-                    if (j == -1) {
+                    if ((j = names.find(',')) == -1) {
                         break;
                     }
                     names = names.substr(j);
@@ -206,12 +198,11 @@ void parse (string & file, vector<string> & imported, map<string, vector<string>
             }
         }
         for (string & name : split) {
-            while (!name.empty() && find(defines.begin(), defines.end(), name[0]) != defines.end()) {
+            while (!name.empty() && find(defines.begin(), defines.end(), name.front()) != defines.end()) {
                 name = name.substr(1);
             }
             for (char & i : defines) {
-                size_t j = name.find(i);
-                if (j != -1) {
+                if ((j = name.find(i)) != -1) {
                     name = name.substr(0, j);
                 }
             }
@@ -222,9 +213,9 @@ void parse (string & file, vector<string> & imported, map<string, vector<string>
     string base64 = "$0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
 
     auto replace = [&](string & text, string & past, string next) -> string {
-        size_t a = 0;
-        size_t i = past.length();
-        size_t j = next.length();
+        int a = 0;
+        int i = past.length();
+        int j = next.length();
         while ((a = text.find(past, a)) != -1) {
             if (text.length() < a + i + 1) {
                 return text;
@@ -259,18 +250,13 @@ void parse (string & file, vector<string> & imported, map<string, vector<string>
     }
     text = "";
     for (string & line : lines) {
-        string a = line;
-        string b = a.substr(0, 1);
-        while (b == "\t" || b == " ") {
-            a = a.substr(1);
-            b = a.substr(0, 1);
-        }
+        string a = line.substr(line.find_first_not_of("\t "));
         if (a.rfind("export default ", 0) == 0) {
             line = a.substr(15);
         } else if (a.rfind("export ", 0) == 0) {
-            a = line = a.substr(7);
-            a.erase(a.begin(), find_if_not(a.begin(), a.end(), ::isspace));
-            if (a[0] == '{') {
+            line = a.substr(7);
+            a = line.substr(line.find_first_not_of("\t "));
+            if (a.front() == '{') {
                 continue;
             }
         }
