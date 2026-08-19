@@ -1,7 +1,7 @@
 // clang++ serve.cpp -o serve.out && ./serve.out a 1234
 
+#include <cstdio>
 #include <fstream>
-#include <iostream>
 #include <map>
 #include <netinet/in.h>
 #include <sstream>
@@ -25,7 +25,7 @@ void serve (string folder, int port) {
     sock.sin_port = htons(port);
     bind(server, (struct sockaddr *) & sock, sizeof(sock));
     listen(server, 5);
-    cout << "localhost:" << port << "\n";
+    printf("localhost:%d\n", port);
     while (true) {
         socklen_t length = sizeof(sock);
         int client = accept(server, (struct sockaddr *) & sock, & length);
@@ -37,9 +37,9 @@ void serve (string folder, int port) {
         while ((i = file.find("%20")) != -1) {
             file.replace(i, 3, " ");
         }
-        string type = "";
+        string type;
         ifstream f(folder + file);
-        if (file.front() != '/' || f.peek() == ifstream::traits_type::eof()) {
+        if (file.front() != '/' || f.peek() == -1) {
             f.close();
             f.open(folder + "/x.html");
             type = "text/html";
